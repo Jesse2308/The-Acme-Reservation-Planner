@@ -6,25 +6,26 @@ const uuid = require("uuid");
 
 async function createTables() {
   const SQL = `
+        DROP TABLE IF EXISTS reservation;
         DROP TABLE IF EXISTS customer;
         DROP TABLE IF EXISTS restaurant;
-        DROP TABLE IF EXISTS reservation;
 
         CREATE TABLE restaurant(
                 id UUID PRIMARY KEY,
                 name VARCHAR(100)
         );
 
-        CREATE TABLE reservation(
+        CREATE TABLE customer( 
                 id UUID PRIMARY KEY,
                 name VARCHAR(100)
         );
 
-        CREATE TABLE customer( 
+        CREATE TABLE reservation(
                 id UUID PRIMARY KEY,
-                restaurant_id UUID REFERENCES restaurant(id)NOT NULL,
-                reservation_id UUID REFERENCES reservation(id)NOT NULL,
-                arrival_date DATE
+                date DATE,
+                party_count INT,
+                customer_id UUID REFERENCES customer(id) NOT NULL,
+                restaurant_id UUID REFERENCES restaurant(id) NOT NULL
         );
         `;
 
@@ -37,23 +38,25 @@ const createRestaurant = async ({ name }) => {
   return response.rows[0];
 };
 
-const createReservation = async ({ name }) => {
-  const SQL = `INSERT INTO reservation(id, name) VALUES($1, $2) RETURNING *`;
-  const response = await client.query(SQL, [uuid.v4(), name]);
-  return response.rows[0];
-};
-const createCustomer = async ({
+const createReservation = async ({
+  date,
+  party_count,
+  customer_id,
   restaurant_id,
-  reservation_id,
-  arrival_date,
 }) => {
-  const SQL = `INSERT INTO customer(id, restaurant_id, reservation_id, arrival_date) VALUES($1, $2, $3, $4) RETURNING *`;
+  const SQL = `INSERT INTO reservation(id, date, party_count, customer_id, restaurant_id) VALUES($1, $2, $3, $4, $5) RETURNING *`;
   const response = await client.query(SQL, [
     uuid.v4(),
+    date,
+    party_count,
+    customer_id,
     restaurant_id,
-    reservation_id,
-    arrival_date,
   ]);
+  return response.rows[0];
+};
+const createCustomer = async ({ name }) => {
+  const SQL = `INSERT INTO customer(id, name) VALUES($1, $2) RETURNING *`;
+  const response = await client.query(SQL, [uuid.v4(), name]);
   return response.rows[0];
 };
 
@@ -75,6 +78,10 @@ const fetchCustomers = async () => {
   return response.rows;
 };
 
+const destroyReservationsByCustomerId = async (customer_id) => {
+  const SQL = `DELETE FROM reservation WHERE customer_id = $1 RETURNING *`;
+  await client.query(SQL, [customer_id]);
+};
 const destroyCustomers = async (id) => {
   const SQL = `DELETE FROM customer WHERE id = $1 RETURNING *`;
 
@@ -91,4 +98,5 @@ module.exports = {
   fetchReservations,
   fetchCustomers,
   destroyCustomers,
+  destroyReservationsByCustomerId,
 };
